@@ -1,0 +1,141 @@
+# ip a
+
+Для розблокуровки мережі.
+# rfkill unblock wifi
+
+Підключіться до інтернету
+# ip link set "wlan0"
+	або
+Якщо, WiFi:
+# iwctl
+# station "wlan" connect "localhost"
+# exit
+
+Розкладка консолі за замовчуванням — US. Перегляньте доступні розкладки з допомогою: 
+# ls /usr/share/kbd/keymaps/**/*.map.gz
+
+Щоб змінити розкладку, додайте відповідну назву файлу до loadkeys, забравши шлях та розширення. Наприклад для української розкладки:
+# loadkeys ua-utf
+
+Консольні шрифти знаходяться в /usr/share/kbd/consolefonts/ і їх так само можна використати з допомогою setfont:
+# setfont UniCyr_8x16
+
+Оновити системний годинник
+# timedatectl set-ntp true
+
+Розбити диск
+# fdisk -l
+# cfdisk "/dev/sda"
+
+sda1 - 512M -> Efi System
+sda2 - 100% FREE -> Linux LVM
+
+Сворюємо шифрований розділ
+# cryptsetup luksFormat "/dev/sda2"
+
+Відкриваємо шифрований розділ
+# cryptsetup open "/dev/sda2" "lvm"
+lvm - точка, монтується /dev/mapper/lvm
+
+Створюєм volume
+# pvcreate /dev/mapper/lvm
+
+Створюєм volume group
+# vgcreate vg0 /dev/mapper/lvm
+
+Створюєм logic volume
+# lvcreate -L 4GB vg0 -n swap
+# lvcreate -l 100%FREE vg0 -n root
+
+Форматуєм розділи Efi to fat32, root to ext4, swap to swap
+# mkfs.fat -F32 "/dev/sda1"
+# mkfs.ext4 "/dev/vg0/root"
+# mkswap "/dev/vg0/swap"
+
+Монтуємо розділи
+# mount "/dev/vg0/root" /mnt
+# mkdir /mnt/boot
+# mount "/dev/sda1" /mnt/boot
+# swapon "/dev/vg0/swap"
+
+Install reflector
+# pacman -Sy reflector
+# reflector --verbose -c Ukraine -p https --sort rate --save /etc/pacman.d/mirrorlist
+
+Install base-packages
+# pacstrap /mnt base linux linux-firmware base-devel linux-headers lvm2 nano git networkmanager openssh
+
+Generate fstab && chroot
+# genfstab -U /mnt >> /mnt/etc/fstab
+# arch-chroot /mnt
+
+Часова зона
+# ln -sf /usr/share/zoneinfo/Europe/Kyiv /etc/localtime
+# hwclock --systohc
+
+Розкоментувати en_US.UTF-8 UTF-8 та інші потрібні локалі в /etc/locale.gen, та створіть їх з допомогою: 
+# locale-gen
+
+Створіть locale.conf та встановити змінну LANG
+# echo "LANG=uk_UA.UTF-8" >> /etc/locale.conf
+
+Якщо ви вибрали розкладку клавіатури, зробіть зміни постійними в vconsole.conf:
+/etc/vconsole.conf
+
+KEYMAP=ua-utf
+FONT=UniCyr_8x16
+
+Налаштування мережі
+# echo "arch" >> /etc/hostname
+# nano /etc/hosts
+127.0.0.1	localhost
+::1			localhost
+127.0.1.1	arch.localdomain	arch
+
+Start service
+# systemctl enable sshd
+# systemctl enable NetworkManager
+
+Install
+# pacman -S vim neovim htop neofetch net-tools
+
+# nano /etc/sudoers
+uncomment %wheel ALL=(ALL) ALL
+
+create user b0ban
+# useradd -m -G wheel b0ban
+password b0ban
+# passwd b0ban
+password root
+# passwd
+
+
+# pacman -S intel-ucode
+
+Edit /etc/mkinitcpio.conf
+# nano /etc/mkinitcpio.conf
+HOOKS=(base *udev autodetect modconf kms keyboard *keymap *consolefont block *encrypt *lvm2 filesystems fsck)
+# mkinitcpio -P
+
+Install
+# pacman -S grub efibootmgr os-prober
+# grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB
+
+# blkid
+copy "/dev/sda2" UUID as uuid
+
+# nano /etc/default/grub
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=uuid:lvm root=/dev/vg0/root"
+uncomment it:
+GRUB_ENABLE_CRYPTODISK=y
+GRUB_DISABLE_OS_PROBER=false
+
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# exit
+# umount -R /mnt
+# reboot
+
+To install Xorg, execute the following command:
+pacman -S xorg-server
+
