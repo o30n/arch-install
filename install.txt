@@ -11,6 +11,11 @@
 # station "wlan" connect "localhost"
 # exit
 
+Ставимо шрифт
+# pacman -S terminus-font
+# cd /usr/share/kbd/consolefonts
+# setfont ter-u20b.psf.gz
+
 Розкладка консолі за замовчуванням — US. Перегляньте доступні розкладки з допомогою: 
 # ls /usr/share/kbd/keymaps/**/*.map.gz
 
